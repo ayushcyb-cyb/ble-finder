@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find-BLE</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>&#9673; FIND&middot;BLE</h1>
+  <div class="ctl">
+    <label class="chk"><input type="checkbox" id="group" checked> group duplicates</label>
+    <span class="muted">range</span>
+    <select id="range"></select>
+    <span class="muted" id="stat">0</span>
+  </div>
+</header>
+
+<main>
+  <section id="stage">
+    <canvas id="radar"></canvas>
+    <div class="hint">scroll = zoom &middot; click a device to find it &middot; <span id="rng"></span></div>
+  </section>
+
+  <aside id="right">
+    <div id="find" class="hidden"></div>
+    <div class="tblwrap">
+      <table><thead><tr><th></th><th>#</th><th>m</th><th>RSSI</th><th>State</th>
+        <th>Vendor</th><th>Name</th><th>Decoded</th></tr></thead>
+        <tbody id="rows"></tbody></table>
+    </div>
+    <div class="legend">
+      <span><span class="mk solid"></span>ACTIVE</span>
+      <span><span class="mk ring"></span>PASSIVE</span>
+      <span><span class="mk faded"></span>STALE</span>
+      <span class="muted">color = device</span>
+    </div>
+  </aside>
+</main>
+
+<footer><b>Est. m</b> is an RSSI&rarr;distance estimate (walls &amp; transmit power skew it; use
+  <b>Calibrate&nbsp;1m</b> on a target for accuracy). <b>Angle is illustrative, not real
+  direction</b> &mdash; one antenna can't measure bearing. To <b>find</b> a device, open it and
+  walk toward <b>WARMER</b>.</footer>
+
+<div id="tip"></div>
+<script src="app.js"></script>
+</body></html>
