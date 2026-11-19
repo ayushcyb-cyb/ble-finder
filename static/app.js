@@ -155,27 +155,31 @@ function drawRows(){
 }
 
 // ---- find panel -------------------------------------------------------------
-async function open(idx){selected=idx;await refreshFind();drawRows();}
-function closeFind(){selected=null;findEl.classList.add('hidden');drawRows();}
+// The panel is BUILT ONCE when a device is selected, then only its changing
+// values are updated each poll. This keeps the "name this device" input alive
+// (focus + typed text preserved) instead of being wiped by a full re-render.
+let findDev = null;
+
+async function open(idx){selected=idx;findDev=null;await refreshFind();drawRows();}
+function closeFind(){selected=null;findDev=null;findEl.classList.add('hidden');drawRows();}
 
 async function refreshFind(){
   if(selected==null)return;
   let d;try{d=await(await fetch('/api/device/'+selected)).json();}catch(e){return;}
   if(d.error){closeFind();return;}
-  let strength=Math.max(0,Math.min(100,(d.rssi+100)/70*100));
-  let barCol=strength>66?'#3ad35a':strength>33?'#e3b341':'#e3675a';
-  let tr=d.trend, tcls=tr>0.6?'warm':tr<-0.6?'cold':'steady',
-      ttxt=tr>0.6?'WARMER &#9650;':tr<-0.6?'COLDER &#9660;':'steady';
+  if(findDev!==d.index){buildFind(d);findDev=d.index;}   // structure only on change
+  updateFind(d);                                          // values every time
+}
+
+function buildFind(d){
   findEl.classList.remove('hidden');
   findEl.innerHTML=
-    '<div class="top"><div><div class="nm">'+(d.name||'(no name)')+'</div>'+
-      '<div class="sub">'+(d.vendor||'unknown vendor')+' &middot; #'+d.index+' &middot; '+d.state+
-        (d.label?' &middot; <span class="badge">known</span>':'')+'</div></div>'+
+    '<div class="top"><div><div class="nm" id="f_name"></div>'+
+      '<div class="sub" id="f_sub"></div></div>'+
       '<span class="x" onclick="closeFind()">&times;</span></div>'+
-    '<div class="meter"><div style="width:'+strength.toFixed(0)+'%;background:'+barCol+'"></div></div>'+
-    '<div class="bigdist"><b>'+d.dist.toFixed(1)+'</b> m'+
-      (d.calibrated?' <span class="badge">calibrated</span>':'')+
-      ' &middot; <span class="trend '+tcls+'">'+ttxt+'</span></div>'+
+    '<div class="meter"><div id="f_meter"></div></div>'+
+    '<div class="bigdist"><b id="f_dist"></b> m <span id="f_cal"></span>'+
+      ' &middot; <span class="trend" id="f_trend"></span></div>'+
     '<canvas id="spark"></canvas>'+
     '<div class="btns">'+
       '<button class="pairbtn" onclick="pair('+d.index+')">Pair</button>'+
@@ -183,20 +187,51 @@ async function refreshFind(){
       '<button onclick="calibrate('+d.index+')">Calibrate 1m</button>'+
       '<button onclick="closeFind()">Close</button></div>'+
     '<dl>'+
-      '<dt>Address</dt><dd>'+d.address+(d.addr_type?' <span class="muted">('+d.addr_type+')</span>':'')+'</dd>'+
-      '<dt>RSSI</dt><dd>'+d.rssi+' dBm'+(d.tx_power!=null?' &middot; tx '+d.tx_power:'')+'</dd>'+
-      '<dt>Decoded</dt><dd>'+(d.decoded||'-')+'</dd>'+
-      (d.appearance?'<dt>Appearance</dt><dd>'+d.appearance+'</dd>':'')+
-      (d.fast_pair_model?'<dt>Fast Pair</dt><dd>model 0x'+d.fast_pair_model+'</dd>':'')+
-      '<dt>Services</dt><dd>'+((d.services_all&&d.services_all.join(', '))||'-')+'</dd>'+
-      (d.mfg_hex?'<dt>Mfg data</dt><dd>'+d.mfg_hex+'</dd>':'')+
-      '<dt>Fingerprint</dt><dd>'+(d.fingerprint||'-')+'</dd>'+
-      (d.model_info?'<dt>Identify</dt><dd>'+d.model_info+'</dd>':'')+
-      (d.pair_status?'<dt>Pair</dt><dd>'+d.pair_status+'</dd>':'')+
+      '<dt>Address</dt><dd id="f_addr"></dd>'+
+      '<dt>RSSI</dt><dd id="f_rssi"></dd>'+
+      '<dt>Decoded</dt><dd id="f_decoded"></dd>'+
+      '<dt id="f_appdt">Appearance</dt><dd id="f_app"></dd>'+
+      '<dt id="f_fpdt">Fast Pair</dt><dd id="f_fp"></dd>'+
+      '<dt>Services</dt><dd id="f_svc"></dd>'+
+      '<dt id="f_mfgdt">Mfg data</dt><dd id="f_mfg"></dd>'+
+      '<dt>Fingerprint</dt><dd id="f_fpr"></dd>'+
+      '<dt id="f_iddt">Identify</dt><dd id="f_id"></dd>'+
+      '<dt id="f_pairdt">Pair</dt><dd id="f_pairv"></dd>'+
     '</dl>'+
-    '<div class="labelrow"><input id="lbl" maxlength="64" placeholder="name this device (saved locally)" value="'+
-      (d.label||'').replace(/"/g,'&quot;')+'">'+
+    '<div class="labelrow"><input id="lbl" maxlength="64" placeholder="name this device (saved locally)">'+
       '<button onclick="labelDev('+d.index+')">Save as known</button></div>';
+  document.getElementById('lbl').value=d.label||'';   // set once, never on update
+}
+
+function setRow(dtId,ddId,val){
+  let dt=document.getElementById(dtId),dd=document.getElementById(ddId);
+  if(!dt||!dd)return;
+  if(val){dt.style.display='';dd.style.display='';dd.textContent=val;}
+  else{dt.style.display='none';dd.style.display='none';}
+}
+
+function updateFind(d){
+  let strength=Math.max(0,Math.min(100,(d.rssi+100)/70*100));
+  let barCol=strength>66?'#3ad35a':strength>33?'#e3b341':'#e3675a';
+  let m=document.getElementById('f_meter');if(m){m.style.width=strength.toFixed(0)+'%';m.style.background=barCol;}
+  document.getElementById('f_name').textContent=d.name||'(no name)';
+  document.getElementById('f_sub').innerHTML=(d.vendor||'unknown vendor')+' &middot; #'+d.index+' &middot; '+d.state+
+    (d.label?' &middot; <span class="badge">known</span>':'');
+  document.getElementById('f_dist').textContent=d.dist.toFixed(1);
+  document.getElementById('f_cal').innerHTML=d.calibrated?'<span class="badge">calibrated</span>':'';
+  let tr=d.trend,tcls=tr>0.6?'warm':tr<-0.6?'cold':'steady',
+      ttxt=tr>0.6?'WARMER &#9650;':tr<-0.6?'COLDER &#9660;':'steady';
+  let te=document.getElementById('f_trend');te.className='trend '+tcls;te.innerHTML=ttxt;
+  document.getElementById('f_addr').innerHTML=d.address+(d.addr_type?' <span class="muted">('+d.addr_type+')</span>':'');
+  document.getElementById('f_rssi').textContent=d.rssi+' dBm'+(d.tx_power!=null?' · tx '+d.tx_power:'');
+  document.getElementById('f_decoded').textContent=d.decoded||'-';
+  document.getElementById('f_svc').textContent=(d.services_all&&d.services_all.join(', '))||'-';
+  document.getElementById('f_fpr').textContent=d.fingerprint||'-';
+  setRow('f_appdt','f_app',d.appearance);
+  setRow('f_fpdt','f_fp',d.fast_pair_model?'model 0x'+d.fast_pair_model:'');
+  setRow('f_mfgdt','f_mfg',d.mfg_hex);
+  setRow('f_iddt','f_id',d.model_info);
+  setRow('f_pairdt','f_pairv',d.pair_status);
   drawSpark(d.history||[]);
 }
 function drawSpark(series){
@@ -225,9 +260,13 @@ async function calibrate(idx){
 }
 async function labelDev(idx){
   let el=document.getElementById('lbl'); if(!el)return;
-  try{await fetch('/api/label/'+idx,{method:'POST',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify({name:el.value})});}catch(e){}
-  refreshFind();poll();
+  let btn=el.nextElementSibling, prev=btn?btn.textContent:'';
+  try{
+    await fetch('/api/label/'+idx,{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({name:el.value})});
+    if(btn){btn.textContent='Saved ✓';setTimeout(()=>{if(btn)btn.textContent=prev;},1500);}
+  }catch(e){}
+  findDev=null;refreshFind();poll();   // rebuild once to reflect the saved label
 }
 window.closeFind=closeFind;window.identify=identify;window.calibrate=calibrate;
 window.pair=pair;window.labelDev=labelDev;
