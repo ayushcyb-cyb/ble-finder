@@ -187,7 +187,7 @@ function buildFind(d){
       '<button onclick="calibrate('+d.index+')">Calibrate 1m</button>'+
       '<button onclick="closeFind()">Close</button></div>'+
     '<dl>'+
-      '<dt>Address</dt><dd id="f_addr"></dd>'+
+      '<dt>Address</dt><dd><span id="f_addrv"></span><span class="muted" id="f_addrt"></span></dd>'+
       '<dt>RSSI</dt><dd id="f_rssi"></dd>'+
       '<dt>Decoded</dt><dd id="f_decoded"></dd>'+
       '<dt id="f_appdt">Appearance</dt><dd id="f_app"></dd>'+
@@ -203,30 +203,42 @@ function buildFind(d){
   document.getElementById('lbl').value=d.label||'';   // set once, never on update
 }
 
+// Write to the DOM only when the value actually changed. Re-writing a text
+// node every second would collapse any text the user is selecting, so guarding
+// these keeps the static fields (name, MAC, fingerprint, ...) selectable while
+// the live ones still update.
+const $ = id => document.getElementById(id);
+function setText(el, v){ if(el && el.textContent !== v) el.textContent = v; }
+function setHTML(el, v){ if(el && el.innerHTML !== v) el.innerHTML = v; }
+
 function setRow(dtId,ddId,val){
-  let dt=document.getElementById(dtId),dd=document.getElementById(ddId);
+  let dt=$(dtId),dd=$(ddId),disp=val?'':'none';
   if(!dt||!dd)return;
-  if(val){dt.style.display='';dd.style.display='';dd.textContent=val;}
-  else{dt.style.display='none';dd.style.display='none';}
+  if(dt.style.display!==disp)dt.style.display=disp;
+  if(dd.style.display!==disp)dd.style.display=disp;
+  if(val)setText(dd,val);
 }
 
 function updateFind(d){
   let strength=Math.max(0,Math.min(100,(d.rssi+100)/70*100));
   let barCol=strength>66?'#3ad35a':strength>33?'#e3b341':'#e3675a';
-  let m=document.getElementById('f_meter');if(m){m.style.width=strength.toFixed(0)+'%';m.style.background=barCol;}
-  document.getElementById('f_name').textContent=d.name||'(no name)';
-  document.getElementById('f_sub').innerHTML=(d.vendor||'unknown vendor')+' &middot; #'+d.index+' &middot; '+d.state+
-    (d.label?' &middot; <span class="badge">known</span>':'');
-  document.getElementById('f_dist').textContent=d.dist.toFixed(1);
-  document.getElementById('f_cal').innerHTML=d.calibrated?'<span class="badge">calibrated</span>':'';
-  let tr=d.trend,tcls=tr>0.6?'warm':tr<-0.6?'cold':'steady',
+  let m=$('f_meter');
+  if(m){let w=strength.toFixed(0)+'%';if(m.style.width!==w)m.style.width=w;
+    if(m.style.background!==barCol)m.style.background=barCol;}
+  setText($('f_name'),d.name||'(no name)');
+  setHTML($('f_sub'),(d.vendor||'unknown vendor')+' &middot; #'+d.index+' &middot; '+d.state+
+    (d.label?' &middot; <span class="badge">known</span>':''));
+  setText($('f_dist'),d.dist.toFixed(1));
+  setHTML($('f_cal'),d.calibrated?'<span class="badge">calibrated</span>':'');
+  let tr=d.trend,tcls='trend '+(tr>0.6?'warm':tr<-0.6?'cold':'steady'),
       ttxt=tr>0.6?'WARMER &#9650;':tr<-0.6?'COLDER &#9660;':'steady';
-  let te=document.getElementById('f_trend');te.className='trend '+tcls;te.innerHTML=ttxt;
-  document.getElementById('f_addr').innerHTML=d.address+(d.addr_type?' <span class="muted">('+d.addr_type+')</span>':'');
-  document.getElementById('f_rssi').textContent=d.rssi+' dBm'+(d.tx_power!=null?' · tx '+d.tx_power:'');
-  document.getElementById('f_decoded').textContent=d.decoded||'-';
-  document.getElementById('f_svc').textContent=(d.services_all&&d.services_all.join(', '))||'-';
-  document.getElementById('f_fpr').textContent=d.fingerprint||'-';
+  let te=$('f_trend');if(te){if(te.className!==tcls)te.className=tcls;setHTML(te,ttxt);}
+  setText($('f_addrv'),d.address);
+  setText($('f_addrt'),d.addr_type?' ('+d.addr_type+')':'');
+  setText($('f_rssi'),d.rssi+' dBm'+(d.tx_power!=null?' · tx '+d.tx_power:''));
+  setText($('f_decoded'),d.decoded||'-');
+  setText($('f_svc'),(d.services_all&&d.services_all.join(', '))||'-');
+  setText($('f_fpr'),d.fingerprint||'-');
   setRow('f_appdt','f_app',d.appearance);
   setRow('f_fpdt','f_fp',d.fast_pair_model?'model 0x'+d.fast_pair_model:'');
   setRow('f_mfgdt','f_mfg',d.mfg_hex);
