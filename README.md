@@ -41,6 +41,9 @@ without any special hardware.
   locally.
 - **State awareness** — ACTIVE / PASSIVE (background beacons, the "looks off but
   still transmitting" case) / STALE (gone quiet).
+- **Live, stable UI** — the detail panel updates in real time (meter, distance,
+  trend, sparkline) using in-place DOM updates, so refreshing never disrupts text
+  you're selecting to copy or a device name you're typing.
 
 ## Tech stack
 
@@ -54,7 +57,7 @@ and bundled vendor databases. No frameworks, no build step, no cloud.
 
 ```bash
 # 1. clone and enter
-git clone https://github.com/<your-username>/ble-finder.git
+git clone https://github.com/ayushcyb-cyb/ble-finder.git
 cd ble-finder
 
 # 2. (recommended) virtual environment
