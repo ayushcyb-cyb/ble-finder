@@ -104,6 +104,15 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=enrich.pair_blocking,
                              args=(d.address, STORE, idx), daemon=True).start()
             return self._json({"ok": True, "status": "pairing"})
+        if p.startswith("/api/label/"):
+            idx = int(p.rsplit("/", 1)[1])
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except Exception:
+                body = {}
+            name = str(body.get("name", "")).strip()[:64]
+            return self._json({"ok": STORE.set_label(idx, name)})
         self.send_error(404)
 
 
@@ -143,29 +152,39 @@ def scan_real():
 
 
 def scan_demo():
+    FP = "0000fe2c-0000-1000-8000-00805f9b34fb"
+    # (address, name, mfg, service_uuids, service_data) - addresses chosen so
+    # address-type classification is meaningful (public vs random subtypes).
     seed = [
-        ("A1:00", "Galaxy Buds4", {0x0075: b"\x01\x00\x02"}, []),
-        ("A2:00", "Galaxy Buds4 LE", {0x0075: b"\x01\x00\x02"}, []),   # dup earbud
-        ("A3:00", "Galaxy Buds4", {0x0075: b"\x01\x00\x02"}, []),      # dup earbud
-        ("B1:00", "", {0x004C: b"\x12\x02\xaa\xbb"}, []),              # Apple Find My
-        ("B2:00", "", {0x004C: b"\x10\x05\x00\x00\x00\x00\x00"}, []),  # Apple Nearby
-        ("C1:00", "Pixel Buds Pro", {}, ["0000fe2c-0000-1000-8000-00805f9b34fb"]),
-        ("D1:00", "", {0x0006: b"\x01\x00"}, []),                      # MS Swift Pair
-        ("E1:00", "RuuviTag", {0x0499: b"\x05\x00"}, []),
-        ("F1:00", "MI Band 8", {0x0157: b"\x00"}, ["0000fe95-0000-1000-8000-00805f9b34fb"]),
-        ("G1:00", "JBL Flip 6", {0x0057: b"\x00"}, []),
-        ("H1:00", "Tile Mate", {}, ["0000feed-0000-1000-8000-00805f9b34fb"]),
+        ("3c:5a:b4:10:00:01", "Galaxy Buds4", {0x0075: b"\x01\x00\x02"}, [], {}),
+        ("3c:5a:b4:10:00:02", "Galaxy Buds4 LE", {0x0075: b"\x01\x00\x02"}, [], {}),
+        ("3c:5a:b4:10:00:03", "Galaxy Buds4", {0x0075: b"\x01\x00\x02"}, [], {}),
+        ("6e:11:22:33:44:01", "", {0x004C: b"\x12\x02\xaa\xbb"}, [], {}),            # Apple Find My, resolvable-private
+        ("6e:11:22:33:44:02", "", {0x004C: b"\x10\x05\x00\x00\x00\x00\x00"}, [], {}),
+        ("d8:0d:17:00:00:01", "Pixel Buds Pro", {}, [FP], {FP: b"\x2a\xbb\xcc"}),    # Fast Pair model
+        ("d8:0d:17:00:00:02", "", {0x0006: b"\x01\x00"}, [], {}),                    # MS Swift Pair
+        ("fc:fb:fb:00:00:01", "RuuviTag", {0x0499: b"\x05\x00"}, [], {}),
+        ("c3:aa:bb:cc:dd:01", "MI Band 8", {0x0157: b"\x00"},
+         ["0000fe95-0000-1000-8000-00805f9b34fb"], {}),                             # random-static
+        ("fc:fb:fb:00:00:02", "JBL Flip 6", {0x0057: b"\x00"}, [], {}),
+        ("fc:fb:fb:00:00:03", "Tile Mate", {}, ["0000feed-0000-1000-8000-00805f9b34fb"], {}),
     ]
-    extra = [("Z%02d:00" % i, "", {random.choice([0x004C, 0x0075, 0x0006, 0x05D6]): b"\x00\x01"}, [])
-             for i in range(12)]
+    # genuinely-unknown devices: random addresses, unlisted company IDs, no name
+    # -> exercises the fallback (address-type, fingerprint, "label this").
+    extra = []
+    for _ in range(9):
+        first = random.choice([0x6e, 0x7a, 0xc3, 0xd6])
+        mac = "%02x:%02x:%02x:%02x:%02x:%02x" % (first, *[random.randint(0, 255) for _ in range(5)])
+        cid = random.choice([0xFFF0, 0xFFFE, 0xFEED0 & 0xFFFF])
+        extra.append((mac, "", {cid: bytes(random.randint(0, 255) for _ in range(4))}, [], {}))
     pool = seed + extra
     base = {a: random.randint(-90, -35) for a, *_ in pool}
     print(f"DEMO mode: {len(pool)} synthetic devices. (No real Bluetooth used.)")
     try:
         while True:
-            for a, name, mfg, svc in pool:
+            for a, name, mfg, svc, sd in pool:
                 base[a] = max(-98, min(-20, base[a] + random.randint(-3, 3)))
-                STORE.update(a, base[a], name, mfg, svc, {}, None)
+                STORE.update(a, base[a], name, mfg, svc, sd, None)
             time.sleep(1)
     except KeyboardInterrupt:
         pass

@@ -169,7 +169,8 @@ async function refreshFind(){
   findEl.classList.remove('hidden');
   findEl.innerHTML=
     '<div class="top"><div><div class="nm">'+(d.name||'(no name)')+'</div>'+
-      '<div class="sub">'+(d.vendor||'unknown vendor')+' &middot; #'+d.index+' &middot; '+d.state+'</div></div>'+
+      '<div class="sub">'+(d.vendor||'unknown vendor')+' &middot; #'+d.index+' &middot; '+d.state+
+        (d.label?' &middot; <span class="badge">known</span>':'')+'</div></div>'+
       '<span class="x" onclick="closeFind()">&times;</span></div>'+
     '<div class="meter"><div style="width:'+strength.toFixed(0)+'%;background:'+barCol+'"></div></div>'+
     '<div class="bigdist"><b>'+d.dist.toFixed(1)+'</b> m'+
@@ -182,14 +183,20 @@ async function refreshFind(){
       '<button onclick="calibrate('+d.index+')">Calibrate 1m</button>'+
       '<button onclick="closeFind()">Close</button></div>'+
     '<dl>'+
-      '<dt>Address</dt><dd>'+d.address+'</dd>'+
+      '<dt>Address</dt><dd>'+d.address+(d.addr_type?' <span class="muted">('+d.addr_type+')</span>':'')+'</dd>'+
       '<dt>RSSI</dt><dd>'+d.rssi+' dBm'+(d.tx_power!=null?' &middot; tx '+d.tx_power:'')+'</dd>'+
       '<dt>Decoded</dt><dd>'+(d.decoded||'-')+'</dd>'+
+      (d.appearance?'<dt>Appearance</dt><dd>'+d.appearance+'</dd>':'')+
+      (d.fast_pair_model?'<dt>Fast Pair</dt><dd>model 0x'+d.fast_pair_model+'</dd>':'')+
       '<dt>Services</dt><dd>'+((d.services_all&&d.services_all.join(', '))||'-')+'</dd>'+
       (d.mfg_hex?'<dt>Mfg data</dt><dd>'+d.mfg_hex+'</dd>':'')+
+      '<dt>Fingerprint</dt><dd>'+(d.fingerprint||'-')+'</dd>'+
       (d.model_info?'<dt>Identify</dt><dd>'+d.model_info+'</dd>':'')+
       (d.pair_status?'<dt>Pair</dt><dd>'+d.pair_status+'</dd>':'')+
-    '</dl>';
+    '</dl>'+
+    '<div class="labelrow"><input id="lbl" maxlength="64" placeholder="name this device (saved locally)" value="'+
+      (d.label||'').replace(/"/g,'&quot;')+'">'+
+      '<button onclick="labelDev('+d.index+')">Save as known</button></div>';
   drawSpark(d.history||[]);
 }
 function drawSpark(series){
@@ -216,7 +223,14 @@ async function calibrate(idx){
   try{await fetch('/api/calibrate/'+idx,{method:'POST'});}catch(e){}
   refreshFind();
 }
-window.closeFind=closeFind;window.identify=identify;window.calibrate=calibrate;window.pair=pair;
+async function labelDev(idx){
+  let el=document.getElementById('lbl'); if(!el)return;
+  try{await fetch('/api/label/'+idx,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({name:el.value})});}catch(e){}
+  refreshFind();poll();
+}
+window.closeFind=closeFind;window.identify=identify;window.calibrate=calibrate;
+window.pair=pair;window.labelDev=labelDev;
 
 // ---- poll loop --------------------------------------------------------------
 async function poll(){

@@ -16,3 +16,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# User-generated device labels (personal data)
+data/known_devices.json

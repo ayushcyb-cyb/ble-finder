@@ -30,8 +30,15 @@ without any special hardware.
 - **Duplicate grouping** — collapses the multiple advertisers of one earbud set
   (left / right / case / LE) into a single entry.
 - **Identify (connect)** — optionally connect once over GATT to read a device's
-  real name / model / manufacturer when it advertises none.
+  real name / model / manufacturer / appearance when it advertises none.
 - **Pair** — send a real BLE pairing request to a device in pairing mode.
+- **Unknown-device characterization** — when nothing matches a database, it
+  still shows the **address type** (public / resolvable-private / random-static /
+  OS-masked), a **Fast Pair model ID**, and a stable **advertisement
+  fingerprint**, instead of a blank.
+- **Local learning** — **Save as known** labels a device once (by address or
+  fingerprint) and recognizes it on every future scan. Your labels, stored
+  locally.
 - **State awareness** — ACTIVE / PASSIVE (background beacons, the "looks off but
   still transmitting" case) / STALE (gone quiet).
 
@@ -81,6 +88,32 @@ It opens `http://127.0.0.1:8500` automatically. Options:
    peaks when you are closest.
 4. Use **Identify** to confirm its name if it doesn't advertise one.
 
+## Unknown devices & local learning
+
+Not every device is in a database, so Find-BLE degrades gracefully from
+*naming* a device to *characterizing* it:
+
+- **Address type** reveals whether an address is vendor-assigned (public) or a
+  rotating privacy address — useful even with no name.
+- An **advertisement fingerprint** (a hash of the packet's structure) is stable
+  per product, so two identical units cluster together and a single device is
+  recognizable over time.
+- **Save as known** lets you label an unknown device once; it's matched by
+  address (if stable) or fingerprint on future scans and stored in
+  `data/known_devices.json` (git-ignored — it's your data).
+
+## Updating the databases
+
+Vendor and service names come from bundled databases that you can refresh:
+
+```bash
+python3 update_data.py
+```
+
+This pulls the latest from the upstream source into `data/`. Provenance and
+licenses are documented in [`data/SOURCES.md`](data/SOURCES.md). Only data that
+is licensed for redistribution is bundled.
+
 ---
 
 ## How it works
@@ -101,11 +134,13 @@ per-device RSSI history drives the finder's trend and sparkline.
 
 ```
 ble-finder/
-├── server.py       # HTTP server, scan loop, REST API, --demo mode
-├── scanner.py      # decoding, device store, distance, history, grouping
-├── enrich.py       # optional GATT Identify + Pair (active connect)
-├── static/         # web app: index.html, style.css, app.js (Canvas radar)
-├── data/           # bundled vendor + service UUID databases
+├── server.py        # HTTP server, scan loop, REST API, --demo mode
+├── scanner.py       # decoding, device store, distance, history, grouping,
+│                    #   address-type, fingerprint, known-device labels
+├── enrich.py        # optional GATT Identify + Pair (active connect)
+├── update_data.py   # refresh the bundled databases from upstream
+├── static/          # web app: index.html, style.css, app.js (Canvas radar)
+├── data/            # bundled vendor + service UUID databases (+ SOURCES.md)
 └── requirements.txt
 ```
 

@@ -14,6 +14,8 @@ sandbox without an adapter.
 """
 import asyncio
 
+import scanner
+
 # Standard GATT characteristic UUIDs (Device Information Service)
 CHARS = {
     "name": "00002a00-0000-1000-8000-00805f9b34fb",         # Device Name
@@ -21,6 +23,7 @@ CHARS = {
     "model": "00002a24-0000-1000-8000-00805f9b34fb",
     "firmware": "00002a26-0000-1000-8000-00805f9b34fb",
 }
+APPEARANCE_CHAR = "00002a01-0000-1000-8000-00805f9b34fb"    # Appearance (uint16)
 
 
 async def _read(address):
@@ -35,6 +38,12 @@ async def _read(address):
                     out[label] = txt
             except Exception:
                 pass
+        try:
+            v = await client.read_gatt_char(APPEARANCE_CHAR)
+            if len(v) >= 2:
+                out["appearance"] = scanner.appearance_name(int.from_bytes(v[:2], "little"))
+        except Exception:
+            pass
     return out
 
 
@@ -60,6 +69,9 @@ def identify_blocking(address, store, index):
     for k in ("manufacturer", "model", "firmware"):
         if info.get(k):
             parts.append(f"{k}: {info[k]}")
+    if info.get("appearance"):
+        dev.appearance = info["appearance"]
+        parts.append(f"appearance: {info['appearance']}")
     dev.model_info = " | ".join(parts) or "connected"
 
 

@@ -42,6 +42,12 @@ canvas#radar{display:block;cursor:crosshair;border-radius:50%;box-shadow:0 0 50p
 .btns button:hover{background:#164026}
 .btns button.pairbtn{background:#18502c;border-color:#2e9a52;color:#eafff0}
 .btns button.pairbtn:hover{background:#1f6638}
+.labelrow{display:flex;gap:6px;margin:8px 0 2px}
+.labelrow input{flex:1 1 auto;min-width:0;background:#0b140d;color:var(--txt);
+  border:1px solid var(--grid);border-radius:7px;padding:5px 9px;font:inherit;font-size:12px}
+.labelrow button{background:#10301c;color:var(--txt);border:1px solid var(--grid);
+  border-radius:7px;padding:5px 10px;font:inherit;cursor:pointer;white-space:nowrap}
+.labelrow button:hover{background:#164026}
 #find dl{margin:6px 0 0;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px}
 #find dt{color:var(--muted)} #find dd{margin:0;word-break:break-all}
 
